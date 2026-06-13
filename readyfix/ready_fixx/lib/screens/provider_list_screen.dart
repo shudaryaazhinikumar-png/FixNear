@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'payment_screen.dart';
 
 class ProviderListScreen extends StatelessWidget {
   const ProviderListScreen({super.key});
@@ -79,26 +80,18 @@ class ProviderListScreen extends StatelessWidget {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: provider['status'] == 'Available'
-                    ? () {
-                        showDialog(
-                          context: context,
-                          builder: (_) => AlertDialog(
-                            title: const Text('Booking Confirmed'),
-                            content: Text(
-                              'Your request has been sent to ${provider['name']}.',
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                },
-                                child: const Text('OK'),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                    : null,
+    ? () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PaymentScreen(
+              providerName: provider['name']!,
+              serviceName: "Electrical Repair",
+            ),
+          ),
+        );
+      }
+    : null,
                 child: Text(provider['status']!),
               ),
             ),
