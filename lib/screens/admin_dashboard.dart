@@ -1,134 +1,65 @@
 import 'package:flutter/material.dart';
 
 class AdminDashboard extends StatelessWidget {
-  const AdminDashboard({super.key});
-
-  // Demo data (later will come from Firestore)
-  final List<Map<String, dynamic>> services = const [
-    {
-      "customer": "Ravi",
-      "provider": "Kumar Electrician",
-      "service": "Electrical Repair",
-      "payment": 500,
-      "adminCut": 100,
-    },
-    {
-      "customer": "Kiran",
-      "provider": "Arun Plumber",
-      "service": "Pipe Fix",
-      "payment": 300,
-      "adminCut": 60,
-    },
-  ];
+  const AdminDashboard({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-
       appBar: AppBar(
-        title: const Text('Administrator Dashboard'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              Navigator.pop(context);
-            },
-          )
-        ],
+        title: const Text('Admin System Metrics'),
+        backgroundColor: Colors.blueGrey,
       ),
-
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // PROFILE SECTION
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.deepPurple.shade100,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Admin Panel",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 5),
-                  Text("Manage all users, services & payments"),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            // STATS CARDS
+            const Text('Platform Activity Insights', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-
-                _buildStatCard("Customers", "12", Colors.blue),
-                _buildStatCard("Providers", "8", Colors.green),
-                _buildStatCard("Services", "20", Colors.orange),
+                Expanded(child: _metricTile('Total Users', '1,420', Colors.blue)),
+                Expanded(child: _metricTile('Active Orders', '42', Colors.orange)),
+                Expanded(child: _metricTile('Commission Split', '₹4,200', Colors.green)),
               ],
             ),
-
-            const SizedBox(height: 20),
-
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Recent Services",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // SERVICE LIST
-            Expanded(
-              child: ListView.builder(
-                itemCount: services.length,
-                itemBuilder: (context, index) {
-                  final s = services[index];
-
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.build, color: Colors.deepPurple),
-
-                      title: Text("${s['service']}"),
-                      subtitle: Text(
-                        "Customer: ${s['customer']}\nProvider: ${s['provider']}",
-                      ),
-
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text("₹${s['payment']}"),
-                          Text(
-                            "Admin ₹${s['adminCut']}",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.red,
+            const SizedBox(height: 24),
+            const Text('Recent Platform Activity Logs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const Text('Scroll wheel to inspect transactional events', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 12),
+            
+            // BOUNDED LAYOUT BOX: Resolves the infinite layout crash
+            SizedBox(
+              height: 200, 
+              child: ListWheelScrollView.useDelegate(
+                itemExtent: 65,
+                physics: const FixedExtentScrollPhysics(),
+                perspective: 0.003,
+                childDelegate: ListWheelChildBuilderDelegate(
+                  childCount: 6,
+                  builder: (context, index) {
+                    return Card(
+                      color: Colors.blueGrey[50],
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.code, color: Colors.blueGrey),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Log ID #1024$index: Secure payment route callback processed successfully.',
+                                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -137,28 +68,17 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  // STAT CARD WIDGET
-  static Widget _buildStatCard(String title, String count, Color color) {
-    return Container(
-      width: 100,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        children: [
-          Text(
-            count,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 5),
-          Text(title),
-        ],
+  Widget _metricTile(String label, String value, Color color) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+            const SizedBox(height: 4),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+          ],
+        ),
       ),
     );
   }

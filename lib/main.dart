@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
-import 'screens/role_selection_screen.dart';
+import 'screens/role_selection_screen.dart'; // Handles the onboarding split
 
 void main() {
   runApp(const FixNearApp());
 }
 
 class FixNearApp extends StatelessWidget {
-  const FixNearApp({super.key});
+  const FixNearApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'FixNear - Coimbatore',
       debugShowCheckedModeBanner: false,
-      title: 'FixNear',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.indigo,
+        scaffoldBackgroundColor: Colors.grey[100],
       ),
-      home: const RoleSelectionScreen(),
+      home: const RoleSelectionScreen(), // Sets landing gate
     );
   }
 }
