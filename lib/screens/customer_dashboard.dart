@@ -1,79 +1,126 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 class CustomerDashboard extends StatefulWidget {
-  const CustomerDashboard({Key? key}) : super(key: key);
+  final String? userName;
+  final String? phone;
+  final String? doorNo;
+  final String? street;
+  final String? area;
+  final String? district;
+  final String? state;
+
+  const CustomerDashboard({
+    super.key,
+    this.userName,
+    this.phone,
+    this.doorNo,
+    this.street,
+    this.area,
+    this.district,
+    this.state,
+  });
 
   @override
   State<CustomerDashboard> createState() => _CustomerDashboardState();
 }
 
 class _CustomerDashboardState extends State<CustomerDashboard> {
-  // Navigation Steps:
-  // 0: Login/Registration Profile Form
-  // 1: Category Selection
-  // 2: Deep Issue Selection & Live Provider Board
-  // 3: Live Mock Tracking Map Simulation
-  // 4: Secure Billing Checkout
-  // 5: Final Checklist ("Payment Successful")
   int _currentStep = 0;
-
-  // Persistent TextEditingControllers to hold entered form data automatically
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _doorNoController = TextEditingController();
-  final TextEditingController _streetController = TextEditingController();
-  final TextEditingController _areaController = TextEditingController();
-  final TextEditingController _districtController = TextEditingController();
-  final TextEditingController _stateController = TextEditingController();
-
-  final _formKey = GlobalKey<FormState>();
-
-  // Custom Olive Green and Cream Palette Design Constants
-  static const Color oliveGreen = Color(0xFF556B2F);
-  static const Color creamBackground = Color(0xFFFDFBF7);
-  static const Color creamCardColor = Color(0xFFFFFDD0);
-
-  // Service Categories
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Electrical', 'icon': Icons.flash_on},
-    {'name': 'Plumbing', 'icon': Icons.water_drop},
-    {'name': 'Borewell Services', 'icon': Icons.waves},
-    {'name': 'Underground Water Tank', 'icon': Icons.layers},
-    {'name': 'Public Complaints', 'icon': Icons.gavel},
-  ];
-
-  // Selected Service Configs
+  String bookingId = "booking_123";
   String? _selectedCategory;
   String? _selectedIssue;
   Map<String, dynamic>? _selectedProvider;
 
-  // Mock Issues Ledger based on selection
-  final Map<String, List<String>> _issuesMap = {
-    'Electrical': ['Fuse replacement', 'Wiring fault', 'High voltage issue', 'Switchboard repair'],
-    'Plumbing': ['Broken pipeline', 'Leakage', 'Drain blockage'],
-    'Borewell Services': ['Borewell motor repair', 'Pump maintenance'],
-    'Underground Water Tank': ['Motor repair', 'Starter issue'],
-    'Public Complaints': ['Government water pipeline leakage'],
-  };
-
-  // Mock Provider Proximity List
-  final List<Map<String, dynamic>> _providers = [
-    {'name': 'Kumar', 'status': 'Available', 'rating': '4.8', 'distance': '2 km', 'isAvailable': true},
-    {'name': 'Ravi', 'status': 'Available', 'rating': '4.5', 'distance': '3 km', 'isAvailable': true},
-    {'name': 'Mani', 'status': 'Busy', 'rating': '4.9', 'distance': '1.5 km', 'isAvailable': false},
-  ];
-
   String _selectedPaymentMethod = 'UPI';
 
+GoogleMapController? _mapController;
+
+LatLng _providerLatLng = const LatLng(11.0168, 76.9558);
+LatLng _customerLatLng = const LatLng(11.0160, 76.9550);
+
+StreamSubscription<Position>? _locationStream;
+
+  static const Color oliveGreen = Color(0xFF556B2F);
+  static const Color creamBackground = Color(0xFFFDFBF7);
+  static const Color creamCardColor = Color(0xFFFFFDD0);
+
+  final List<Map<String, dynamic>> _categories = [
+    {'name': 'Electrical', 'icon': Icons.flash_on},
+    {'name': 'Plumbing', 'icon': Icons.water_drop},
+    {'name': 'Borewell Services', 'icon': Icons.waves},
+    {'name': 'Water Tank', 'icon': Icons.water},
+    {'name': 'Public Complaints', 'icon': Icons.report},
+  ];
+
+  final Map<String, List<String>> _issuesMap = {
+    'Electrical': ['Wiring issue', 'Switch repair', 'Power failure'],
+    'Plumbing': ['Leakage', 'Pipe blockage'],
+    'Borewell Services': ['Motor repair', 'Pump issue'],
+    'Water Tank': ['Motor failure', 'Cleaning'],
+    'Public Complaints': ['Water issue', 'Drainage problem'],
+  };
+
+  final List<Map<String, dynamic>> _providers = [
+    {'name': 'Kumar', 'rating': '4.8', 'distance': '2 km', 'isAvailable': true},
+    {'name': 'Ravi', 'rating': '4.5', 'distance': '3 km', 'isAvailable': true},
+    {'name': 'Mani', 'rating': '4.9', 'distance': '1.5 km', 'isAvailable': false},
+  ];
+
+  // ✅ LIVE TRACKING VARIABLES (ONLY ADDITION)
+  double _trackerX = 0;
+  double _trackerY = 0;
+  Timer? _trackingTimer;
+
+  void _startLiveTracking() {
+    _trackerX = 0;
+    _trackerY = 0;
+
+    _trackingTimer?.cancel();
+
+    _trackingTimer = Timer.periodic(const Duration(milliseconds: 700), (timer) {
+      setState(() {
+        _trackerX += 12;
+        _trackerY += 7;
+
+        if (_trackerX > 120) _trackerX = 0;
+        if (_trackerY > 60) _trackerY = 0;
+      });
+    });
+  }
+  void _startUberTracking() {
+  FirebaseFirestore.instance
+      .collection("live_tracking")
+      .doc(bookingId)
+      .snapshots()
+      .listen((doc) {
+    if (!doc.exists) return;
+
+    final data = doc.data()!;
+
+    setState(() {
+      _providerLatLng = LatLng(
+        data["providerLat"],
+        data["providerLng"],
+      );
+
+      _customerLatLng = LatLng(
+        data["customerLat"],
+        data["customerLng"],
+      );
+    });
+
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLng(_providerLatLng),
+    );
+  });
+}
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _doorNoController.dispose();
-    _streetController.dispose();
-    _areaController.dispose();
-    _districtController.dispose();
-    _stateController.dispose();
+    _trackingTimer?.cancel();
     super.dispose();
   }
 
@@ -82,472 +129,282 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
     return Scaffold(
       backgroundColor: creamBackground,
       appBar: AppBar(
-        title: const Text(
-          'FixNear - Customer Dashboard',
-          style: TextStyle(color: creamBackground, fontWeight: FontWeight.bold),
-        ),
+        title: const Text("FixNear Customer"),
         backgroundColor: oliveGreen,
-        actions: [
-          if (_currentStep > 0)
-            IconButton(
-              icon: const Icon(Icons.account_circle, color: creamBackground, size: 28),
-              tooltip: 'View Profile Registry',
-              onPressed: () {
-                setState(() {
-                  _currentStep = 0; // Navigates back to display the saved user details
-                });
-              },
-            ),
-        ],
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: _buildCurrentWorkflowView(),
-        ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: _buildStep(),
       ),
     );
   }
 
-  Widget _buildCurrentWorkflowView() {
+  Widget _buildStep() {
     switch (_currentStep) {
       case 0:
-        return _buildProfileLoginForm();
+        return _profileView();
       case 1:
-        return _buildCategorySelection();
+        return _categoryView();
       case 2:
-        return _buildDeepIssueAndProviderSelection();
+        return _issueProviderView();
       case 3:
-        return _buildMockTrackingMap();
+        return _trackingView();
       case 4:
-        return _buildBillingCheckout();
+        return _paymentView();
       case 5:
-        return _buildPaymentSuccessView();
+        return _successView();
       default:
-        return _buildProfileLoginForm();
+        return _profileView();
     }
   }
 
-  // STEP 0: Persistent Profile / Login UI
-  Widget _buildProfileLoginForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Customer Profile Registration',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: oliveGreen),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your data is retained seamlessly across workflow screens.',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          _buildTextField(_nameController, 'Full Name', Icons.person),
-          _buildTextField(_phoneController, 'Phone Number', Icons.phone, keyboardType: TextInputType.phone),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12.0),
-            child: Divider(color: oliveGreen, thickness: 1),
-          ),
-          const Text(
-            'Service Dispatch Address',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: oliveGreen),
-          ),
-          const SizedBox(height: 12),
-          _buildTextField(_doorNoController, 'Door No / House Flat No', Icons.home),
-          _buildTextField(_streetController, 'Street Name', Icons.add_road),
-          _buildTextField(_areaController, 'Village / Urban Area Name', Icons.location_city),
-          _buildTextField(_districtController, 'District', Icons.map),
-          _buildTextField(_stateController, 'State', Icons.flag),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: oliveGreen,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              if (_formKey.currentState!.validate()) {
-                setState(() {
-                  _currentStep = 1; // Shifts smoothly to category index mapping
-                });
-              }
-            },
-            child: const Text('Proceed to Services', style: TextStyle(color: Colors.white, fontSize: 16)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // STEP 1: Category Selection UI
-  Widget _buildCategorySelection() {
+  // STEP 0
+  Widget _profileView() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Welcome back, ${_nameController.text}!',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: oliveGreen),
-        ),
-        const SizedBox(height: 4),
-        const Text('Select a utility category to isolate your house breakdown:', style: TextStyle(color: Colors.black87)),
+        const Text("Customer Profile",
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+
+        Text("Name: ${widget.userName}"),
+        Text("Phone: ${widget.phone}"),
+        Text("Address: ${widget.doorNo}, ${widget.street}"),
+        Text("${widget.area}, ${widget.district}, ${widget.state}"),
+
         const SizedBox(height: 20),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _categories.length,
-          itemBuilder: (context, index) {
-            final cat = _categories[index];
-            return Card(
-              color: creamCardColor,
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                leading: Icon(cat['icon'], color: oliveGreen, size: 28),
-                title: Text(cat['name'], style: const TextStyle(fontWeight: FontWeight.bold, color: oliveGreen)),
-                trailing: const Icon(Icons.arrow_forward_ios, color: oliveGreen, size: 16),
-                onTap: () {
-                  setState(() {
-                    _selectedCategory = cat['name'];
-                    _selectedIssue = _issuesMap[_selectedCategory]![0]; // Set default issue
-                    _currentStep = 2;
-                  });
-                },
-              ),
-            );
+
+        ElevatedButton(
+          onPressed: () {
+            setState(() {
+              _currentStep = 1;
+            });
           },
+          child: const Text("Start Service Booking"),
         ),
       ],
     );
   }
 
-  // STEP 2: Deep Issue & Provider Selection Board
-  Widget _buildDeepIssueAndProviderSelection() {
-    final issues = _issuesMap[_selectedCategory] ?? [];
+  // STEP 1
+  Widget _categoryView() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Category: $_selectedCategory',
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: oliveGreen),
-        ),
-        const SizedBox(height: 16),
-        const Text('Specify the exact household breakdown issue:', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: oliveGreen.withOpacity(0.5)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedIssue,
-              isExpanded: true,
-              icon: const Icon(Icons.arrow_drop_down, color: oliveGreen),
-              items: issues.map((String issue) {
-                return DropdownMenuItem<String>(
-                  value: issue,
-                  child: Text(issue),
-                );
-              }).toList(),
-              onChanged: (value) {
+        const Text("Select Category",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+
+        ..._categories.map((cat) {
+          return Card(
+            child: ListTile(
+              leading: Icon(cat['icon']),
+              title: Text(cat['name']),
+              onTap: () {
                 setState(() {
-                  _selectedIssue = value;
+                  _selectedCategory = cat['name'];
+                  _selectedIssue = _issuesMap[_selectedCategory!]!.first;
+                  _currentStep = 2;
                 });
               },
             ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        const Text('Trusted Live Provider Status Dashboard:', style: TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 12),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _providers.length,
-          itemBuilder: (context, index) {
-            final provider = _providers[index];
-            bool isAvail = provider['isAvailable'];
-            return Card(
-              color: Colors.white,
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: oliveGreen.withOpacity(0.2)),
-              ),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: oliveGreen.withOpacity(0.1),
-                  child: Text(provider['name'][0], style: const TextStyle(color: oliveGreen, fontWeight: FontWeight.bold)),
-                ),
-                title: Row(
-                  children: [
-                    Text(provider['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    Text(
-                      isAvail ? '🟢 Available' : '🟠 Busy',
-                      style: TextStyle(fontSize: 12, color: isAvail ? Colors.green : Colors.orange),
-                    ),
-                  ],
-                ),
-                subtitle: Text('Rating: ⭐ ${provider['rating']} | Proximity: ${provider['distance']}'),
-                trailing: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isAvail ? oliveGreen : Colors.grey,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: isAvail
-                      ? () {
-                          setState(() {
-                            _selectedProvider = provider;
-                            _currentStep = 3; // Shift to maps setup tracking
-                          });
-                        }
-                      : null,
-                  child: const Text('Book', style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            );
-          },
-        ),
+          );
+        }),
       ],
     );
   }
 
-  // STEP 3: Live Mock Tracking Map Simulation
-  Widget _buildMockTrackingMap() {
+  // STEP 2
+  Widget _issueProviderView() {
+    final issues = _issuesMap[_selectedCategory!] ?? [];
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('Live Dispatch Map Simulation', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: oliveGreen)),
-        const SizedBox(height: 4),
-        Text('Tracking assigned technician: ${_selectedProvider?['name']}', style: const TextStyle(color: Colors.black54)),
-        const SizedBox(height: 16),
-        Container(
-          height: 250,
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.blue.withOpacity(0.5), width: 2),
-          ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.map_rounded, size: 60, color: Colors.blue),
-                  const SizedBox(height: 12),
-                  const Text('[ Google Maps GPS Connector Placeholder ]', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue)),
-                  const SizedBox(height: 4),
-                  Text('Technician is currently ${_selectedProvider?['distance']} away from house address.', style: const TextStyle(fontSize: 12, color: Colors.black45)),
-                ],
-              ),
-              Positioned(
-                top: 20,
-                right: 20,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)]),
-                  child: const Text('⚡ Simulating GPS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
-                ),
-              )
-            ],
-          ),
-        ),
-        const SizedBox(height: 24),
-        ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: oliveGreen,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          icon: const Icon(Icons.payment, color: Colors.white),
-          label: const Text('Proceed to Secure Billing', style: TextStyle(color: Colors.white, fontSize: 16)),
-          onPressed: () {
+        Text("Category: $_selectedCategory"),
+        const SizedBox(height: 10),
+
+        DropdownButton<String>(
+          value: _selectedIssue,
+          items: issues
+              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+              .toList(),
+          onChanged: (val) {
             setState(() {
-              _currentStep = 4;
+              _selectedIssue = val;
             });
           },
         ),
-      ],
-    );
-  }
 
-  // STEP 4: Secure Billing Checkout UI (with address data verified again)
-  Widget _buildBillingCheckout() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const Text('Secure Invoice Summary', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: oliveGreen)),
-        const SizedBox(height: 16),
-        Card(
-          color: creamCardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('SERVICE DETAILS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),
-                const SizedBox(height: 6),
-                Text('Category: $_selectedCategory', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                Text('Task Component: $_selectedIssue'),
-                Text('Assigned Expert: ${_selectedProvider?['name']} (Rating: ⭐ ${_selectedProvider?['rating']})'),
-                const Divider(height: 24),
-                const Text('DISPATCH GATEWAY PERMANENT ADDRESS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black54)),
-                const SizedBox(height: 6),
-                // Data appears accurately pulled back from initial text field state
-                Text('Customer Name: ${_nameController.text}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text('Phone Connection: ${_phoneController.text}'),
-                Text('Address Line: No. ${_doorNoController.text}, ${_streetController.text}, ${_areaController.text}'),
-                Text('Region: ${_districtController.text}, ${_stateController.text}'),
-                const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('Standard Platform Fare:', style: TextStyle(fontWeight: FontWeight.w500)),
-                    Text('₹499.00', style: TextStyle(fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
         const SizedBox(height: 20),
-        const Text('Select Payment Mechanism:', style: TextStyle(fontWeight: FontWeight.bold, color: oliveGreen)),
-        const SizedBox(height: 8),
-        _buildPaymentRadioOption('UPI (GPay / PhonePe)'),
-        _buildPaymentRadioOption('Cash on Service Delivery'),
-        _buildPaymentRadioOption('Debit Card'),
-        _buildPaymentRadioOption('Credit Card'),
-        const SizedBox(height: 24),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: oliveGreen,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: () {
-            setState(() {
-              _currentStep = 5;
-            });
-          },
-          child: Text('Authorize Fare Payment VIA $_selectedPaymentMethod', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        ),
+
+        ..._providers.map((p) {
+          return Card(
+            child: ListTile(
+              title: Text(p['name']),
+              subtitle: Text("⭐ ${p['rating']} | ${p['distance']}"),
+              trailing: p['isAvailable']
+                  ? ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedProvider = p;
+                          _currentStep = 3;
+
+                          // ✅ START LIVE TRACKING HERE
+                          _startRealTracking();
+                        });
+                      },
+                      child: const Text("Book"),
+                    )
+                  : const Text("Busy"),
+            ),
+          );
+        }),
       ],
     );
   }
 
-  // STEP 5: Final Checklist Checkmark Screen
-  Widget _buildPaymentSuccessView() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 40),
-        const CircleAvatar(
-          radius: 50,
-          backgroundColor: Colors.green,
-          child: Icon(Icons.check, size: 60, color: Colors.white),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          'Payment Successful',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
-        ),
-        const SizedBox(height: 12),
-        Text(
-          'Thank you, ${_nameController.text}! Your local utility service request has been transmitted successfully to ${_selectedProvider?['name']}.',
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 15),
-        ),
-        const SizedBox(height: 40),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: oliveGreen,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  // STEP 3 (LIVE TRACKING ONLY ADDED HERE)
+   Widget _trackingView() {
+  return Column(
+    children: [
+      Text("Tracking ${_selectedProvider?['name']}"),
+      const SizedBox(height: 10),
+
+      SizedBox(
+        height: 350,
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: _providerLatLng,
+            zoom: 15,
           ),
+
+          markers: {
+            Marker(
+              markerId: const MarkerId("provider"),
+              position: _providerLatLng,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueBlue,
+              ),
+            ),
+            Marker(
+              markerId: const MarkerId("customer"),
+              position: _customerLatLng,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueGreen,
+              ),
+            ),
+          },
+
+          polylines: {
+            Polyline(
+              polylineId: const PolylineId("route"),
+              points: [_customerLatLng, _providerLatLng],
+              width: 4,
+            ),
+          },
+
+          onMapCreated: (controller) {
+            _mapController = controller;
+          },
+        ),
+      ),
+
+      const SizedBox(height: 20),
+
+      ElevatedButton(
+        onPressed: () {
+          setState(() {
+            _currentStep = 4;
+          });
+          _startUberTracking();
+        },
+        child: const Text("Go to Payment"),
+      ),
+    ],
+  );
+}
+  // STEP 4
+  Widget _paymentView() {
+    return Column(
+      children: [
+        const Text("Payment"),
+
+        RadioListTile(
+          title: const Text("UPI"),
+          value: "UPI",
+          groupValue: _selectedPaymentMethod,
+          onChanged: (val) {
+            setState(() => _selectedPaymentMethod = val!);
+          },
+        ),
+
+        RadioListTile(
+          title: const Text("Cash"),
+          value: "Cash",
+          groupValue: _selectedPaymentMethod,
+          onChanged: (val) {
+            setState(() => _selectedPaymentMethod = val!);
+          },
+        ),
+        RadioListTile(
+          title: const Text("Credit Card"),
+          value: "Credit card",
+          groupValue: _selectedPaymentMethod,
+          onChanged: (val) {
+            setState(() => _selectedPaymentMethod = val!);
+          },
+        ),
+        RadioListTile(
+          title: const Text("Debit Card"),
+          value: "Debit card",
+          groupValue: _selectedPaymentMethod,
+          onChanged: (val) {
+            setState(() => _selectedPaymentMethod = val!);
+          },
+        ),
+
+        ElevatedButton(
+          onPressed: () => setState(() => _currentStep = 5),
+          child: const Text("Pay"),
+        )
+      ],
+    );
+  }
+
+  // STEP 5
+  Widget _successView() {
+    return Column(
+      children: [
+        const Icon(Icons.check_circle, size: 100, color: Colors.green),
+        const Text("Payment Successful!"),
+        ElevatedButton(
           onPressed: () {
             setState(() {
-              // Wipes out transactional selections, but holds onto the primary layout profile form data parameters!
-              _selectedCategory = null;
-              _selectedIssue = null;
-              _selectedProvider = null;
               _currentStep = 0;
             });
           },
-          child: const Text('Return to Profile Home', style: TextStyle(color: Colors.white)),
-        ),
+          child: const Text("Back to Home"),
+        )
       ],
     );
   }
+  void _startRealTracking() async {
+  LocationPermission permission = await Geolocator.requestPermission();
 
-  // Custom Form Field Generator Component
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {TextInputType keyboardType = TextInputType.text}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon, color: oliveGreen),
-          labelStyle: const TextStyle(color: Colors.black54),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: oliveGreen.withOpacity(0.3), width: 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: oliveGreen, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 1),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Colors.red, width: 2),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        validator: (value) {
-          if (value == null || value.trim().isEmpty) {
-            return 'Please fill in your $label';
-          }
-          return null;
-        },
-      ),
-    );
-  }
+  if (permission == LocationPermission.denied) return;
 
-  Widget _buildPaymentRadioOption(String value) {
-    return Card(
-      color: Colors.white,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: RadioListTile<String>(
-        title: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
-        value: value,
-        groupValue: _selectedPaymentMethod,
-        activeColor: oliveGreen,
-        onChanged: (val) {
-          setState(() {
-            _selectedPaymentMethod = val!;
-          });
-        },
-      ),
+  _locationStream = Geolocator.getPositionStream(
+    locationSettings: const LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5,
+    ),
+  ).listen((Position position) {
+    setState(() {
+      _customerLatLng = LatLng(position.latitude, position.longitude);
+    });
+
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLng(_customerLatLng),
     );
-  }
+  });
+}
 }

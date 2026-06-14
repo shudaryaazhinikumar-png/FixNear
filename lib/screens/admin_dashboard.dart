@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'admin_login_screen.dart';
 
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
@@ -6,87 +7,6 @@ class AdminDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const AdminLoginScreen();
-  }
-}
-
-// ================= ADMIN LOGIN =================
-
-class AdminLoginScreen extends StatelessWidget {
-  const AdminLoginScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-
-    const Color cherry = Color(0xFFBC6266);
-    const Color background = Color(0xFFE7B9AB);
-
-    return Scaffold(
-      backgroundColor: background,
-      appBar: AppBar(
-        title: const Text("Administrator Login"),
-        backgroundColor: cherry,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(25),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.admin_panel_settings,
-              size: 90,
-              color: cherry,
-            ),
-
-            const SizedBox(height: 20),
-
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: "Admin Name",
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: 15),
-
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: "Phone Number",
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: cherry,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const AdminHomeScreen(),
-                    ),
-                  );
-                },
-                child: const Text(
-                  "Login",
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -207,17 +127,11 @@ class ProviderVerificationScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(
-                      Icons.check,
-                      color: Colors.green,
-                    ),
+                    icon: const Icon(Icons.check, color: Colors.green),
                     onPressed: () {},
                   ),
                   IconButton(
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.red,
-                    ),
+                    icon: const Icon(Icons.close, color: Colors.red),
                     onPressed: () {},
                   ),
                 ],
@@ -248,20 +162,14 @@ class PaymentVerificationScreen extends StatelessWidget {
             child: ListTile(
               title: Text("Booking #1001"),
               subtitle: Text("Screenshot Uploaded"),
-              trailing: Icon(
-                Icons.check_circle,
-                color: Colors.green,
-              ),
+              trailing: Icon(Icons.check_circle, color: Colors.green),
             ),
           ),
           Card(
             child: ListTile(
               title: Text("Booking #1002"),
               subtitle: Text("Pending Verification"),
-              trailing: Icon(
-                Icons.pending,
-                color: Colors.orange,
-              ),
+              trailing: Icon(Icons.pending, color: Colors.orange),
             ),
           ),
         ],

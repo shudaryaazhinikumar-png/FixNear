@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "931321173775",
+    "project_id": "fixnear-d84d4",
+    "storage_bucket": "fixnear-d84d4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931321173775:android:1dedf7355cee172da6507a",
+        "android_client_info": {
+          "package_name": "com.example.android"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPlNjfczWbBCRlRIxjYEbskYmG85o5dlY"
+        },
+        {
+          "current_key": "AIzaSyC5eJMoy_3fTOuCMyCH9gHKOV8CMwzL7GI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931321173775:android:51c46eca6cf65279a6507a",
+        "android_client_info": {
+          "package_name": "com.example.ready_fixx"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPlNjfczWbBCRlRIxjYEbskYmG85o5dlY"
+        },
+        {
+          "current_key": "AIzaSyC5eJMoy_3fTOuCMyCH9gHKOV8CMwzL7GI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
