@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'customer_dashboard.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -18,35 +19,57 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   final TextEditingController districtController = TextEditingController();
   final TextEditingController stateController = TextEditingController();
 
-  void continueToDashboard() {
-    if (nameController.text.isEmpty ||
-        phoneController.text.isEmpty ||
-        doorNoController.text.isEmpty ||
-        streetController.text.isEmpty ||
-        areaController.text.isEmpty ||
-        districtController.text.isEmpty ||
-        stateController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill all fields")),
-      );
-      return;
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CustomerDashboard(
-          userName: nameController.text,
-          phone: phoneController.text,
-          doorNo: doorNoController.text,
-          street: streetController.text,
-          area: areaController.text,
-          district: districtController.text,
-          state: stateController.text,
-        ),
-      ),
+  void continueToDashboard() async {
+  if (nameController.text.isEmpty ||
+      phoneController.text.isEmpty ||
+      doorNoController.text.isEmpty ||
+      streetController.text.isEmpty ||
+      areaController.text.isEmpty ||
+      districtController.text.isEmpty ||
+      stateController.text.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Please fill all fields")),
     );
+    return;
   }
+
+  // 🔥 SAVE USER TO FIREBASE FIRST
+  await FirebaseFirestore.instance
+      .collection("users")
+      .doc(phoneController.text)
+      .set({
+    "name": nameController.text,
+    "phone": phoneController.text,
+    "role": "customer",
+    "createdAt": FieldValue.serverTimestamp(),
+  });
+
+  // 🔥 SAVE ADDRESS
+  await FirebaseFirestore.instance.collection("addresses").add({
+    "phone": phoneController.text,
+    "doorNo": doorNoController.text,
+    "street": streetController.text,
+    "area": areaController.text,
+    "district": districtController.text,
+    "state": stateController.text,
+  });
+
+  // 🔥 MOVE TO DASHBOARD
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => CustomerDashboard(
+        userName: nameController.text,
+        phone: phoneController.text,
+        doorNo: doorNoController.text,
+        street: streetController.text,
+        area: areaController.text,
+        district: districtController.text,
+        state: stateController.text,
+      ),
+    ),
+  );
+}
 
   Widget buildField(TextEditingController controller, String label) {
     return Padding(

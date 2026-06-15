@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'provider_dashboard.dart';
 
 class ProviderLoginScreen extends StatefulWidget {
@@ -10,116 +10,93 @@ class ProviderLoginScreen extends StatefulWidget {
 }
 
 class _ProviderLoginScreenState extends State<ProviderLoginScreen> {
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  final TextEditingController experienceController = TextEditingController();
+  final nameController = TextEditingController();
+  final phoneController = TextEditingController();
+  final expController = TextEditingController();
 
-  String qualification = 'Electrician';
+  String qualification = "Electrician";
 
-  static const Color seaGreen = Color(0xFF2E8B80);
-  static const Color mintBackground = Color(0xFFF2FBF9);
+  static const seaGreen = Color(0xFF2E8B80);
 
-  Future<void> saveLogin() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<void> saveProvider() async {
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+    final exp = expController.text.trim();
 
-    await prefs.setString("provider_name", nameController.text);
-    await prefs.setString("provider_phone", phoneController.text);
-    await prefs.setString("provider_exp", experienceController.text);
-    await prefs.setString("provider_qual", qualification);
-    await prefs.setBool("provider_logged_in", true);
+    if (name.isEmpty || phone.isEmpty || exp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Fill all fields")),
+      );
+      return;
+    }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ProviderDashboard(),
-      ),
-    );
+    try {
+      print("SAVING TO FIRESTORE...");
+
+      // Saving inside "users" collection with phone as Document ID
+      await FirebaseFirestore.instance
+          .collection("users")
+          .doc(phone)
+          .set({
+        "name": name,
+        "phone": phone,
+        "experience": exp,
+        "qualification": qualification,
+        "role": "provider",
+        "isAvailable": true,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+
+      print("SAVED SUCCESSFULLY");
+
+      // Passing the phone number directly to the dashboard constructor
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProviderDashboard(providerPhone: phone),
+        ),
+      );
+    } catch (e) {
+      print("ERROR: $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: mintBackground,
-      appBar: AppBar(
-        title: const Text('Service Provider Login'),
-        backgroundColor: seaGreen,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      appBar: AppBar(title: const Text("Provider Login"), backgroundColor: seaGreen),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            const Icon(Icons.handyman, size: 90, color: seaGreen),
-
-            const SizedBox(height: 20),
-
             TextField(
               controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: "Name"),
             ),
-
-            const SizedBox(height: 15),
-
             TextField(
               controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: "Phone"),
             ),
-
-            const SizedBox(height: 15),
-
-            DropdownButtonFormField<String>(
+            TextField(
+              controller: expController,
+              decoration: const InputDecoration(labelText: "Experience"),
+            ),
+            DropdownButtonFormField(
               value: qualification,
-              decoration: const InputDecoration(
-                labelText: 'Qualification',
-                border: OutlineInputBorder(),
-              ),
               items: const [
-                DropdownMenuItem(value: 'Electrician', child: Text('Electrician')),
-                DropdownMenuItem(value: 'Plumber', child: Text('Plumber')),
-                DropdownMenuItem(value: 'Carpenter', child: Text('Carpenter')),
-                DropdownMenuItem(value: 'AC Technician', child: Text('AC Technician')),
-                DropdownMenuItem(value: 'Painter', child: Text('Painter')),
+                DropdownMenuItem(value: "Electrician", child: Text("Electrician")),
+                DropdownMenuItem(value: "Plumber", child: Text("Plumber")),
+                DropdownMenuItem(value: "Carpenter", child: Text("Carpenter")),
               ],
-              onChanged: (value) {
-                setState(() {
-                  qualification = value!;
-                });
+              onChanged: (v) {
+                setState(() => qualification = v.toString());
               },
             ),
-
-            const SizedBox(height: 15),
-
-            TextField(
-              controller: experienceController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Years of Experience',
-                border: OutlineInputBorder(),
-              ),
-            ),
-
-            const SizedBox(height: 25),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: seaGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
-                onPressed: saveLogin,
-                child: const Text(
-                  'Login / Continue',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: saveProvider,
+              child: const Text("Save & Continue"),
+            )
           ],
         ),
       ),

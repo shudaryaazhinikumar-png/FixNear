@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 
 class LiveMapScreen extends StatefulWidget {
   const LiveMapScreen({super.key});
@@ -9,42 +11,79 @@ class LiveMapScreen extends StatefulWidget {
 }
 
 class _LiveMapScreenState extends State<LiveMapScreen> {
-  late GoogleMapController mapController;
+  final MapController _mapController = MapController();
 
-  final LatLng _initialPosition = const LatLng(11.0168, 76.9558); // Coimbatore
+  LatLng _currentPosition =
+      const LatLng(11.0168, 76.9558); // default
 
-  final Set<Marker> _markers = {};
+  Future<Position?> getUserLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return null;
 
-  void _onMapCreated(GoogleMapController controller) {
-    mapController = controller;
+    LocationPermission permission = await Geolocator.checkPermission();
 
-    setState(() {
-      _markers.add(
-        Marker(
-          markerId: const MarkerId("provider"),
-          position: _initialPosition,
-          infoWindow: const InfoWindow(title: "Service Provider"),
-        ),
-      );
-    });
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return null;
+    }
+
+    return await Geolocator.getCurrentPosition();
+  }
+
+  void _loadLocation() async {
+    Position? pos = await getUserLocation();
+
+    if (pos != null) {
+      setState(() {
+        _currentPosition = LatLng(pos.latitude, pos.longitude);
+      });
+
+      _mapController.move(_currentPosition, 15);
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocation();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Live Tracking"),
+        title: const Text("Live Tracking (Free Map)"),
         backgroundColor: Colors.green,
       ),
-      body: GoogleMap(
-        onMapCreated: _onMapCreated,
-        initialCameraPosition: CameraPosition(
-          target: _initialPosition,
-          zoom: 14,
+      body: FlutterMap(
+        mapController: _mapController,
+        options: MapOptions(
+          initialCenter: _currentPosition,
+          initialZoom: 14,
         ),
-        markers: _markers,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
+        children: [
+          TileLayer(
+            urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          ),
+
+          MarkerLayer(
+            markers: [
+              Marker(
+                point: _currentPosition,
+                width: 40,
+                height: 40,
+                child: const Icon(
+                  Icons.location_pin,
+                  color: Colors.red,
+                  size: 40,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

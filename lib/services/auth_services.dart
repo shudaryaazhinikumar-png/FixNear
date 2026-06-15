@@ -13,36 +13,57 @@ class AuthService {
     required String phone,
     required String role,
   }) async {
-    UserCredential userCred =
-        await _auth.createUserWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      UserCredential userCred =
+          await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    await _db.collection("users").doc(userCred.user!.uid).set({
-      "name": name,
-      "phone": phone,
-      "role": role,
-      "uid": userCred.user!.uid,
-      "createdAt": FieldValue.serverTimestamp(),
-    });
+      await _db.collection("users").doc(userCred.user!.uid).set({
+        "name": name,
+        "phone": phone,
+        "role": role,
+        "uid": userCred.user!.uid,
+        "createdAt": FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      throw Exception("Registration failed: $e");
+    }
   }
+  static Future<Map<String, dynamic>?> getUserData() async {
+  final user = _auth.currentUser;
+  if (user == null) return null;
 
+  DocumentSnapshot doc =
+      await _db.collection("users").doc(user.uid).get();
+
+  if (!doc.exists) return null;
+
+  return doc.data() as Map<String, dynamic>;
+}
   // ================= LOGIN =================
   static Future<String?> loginUser({
     required String email,
     required String password,
   }) async {
-    UserCredential userCred =
-        await _auth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    try {
+      UserCredential userCred =
+          await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
-    DocumentSnapshot doc =
-        await _db.collection("users").doc(userCred.user!.uid).get();
+      DocumentSnapshot doc =
+          await _db.collection("users").doc(userCred.user!.uid).get();
 
-    return doc["role"];
+      if (!doc.exists) return null;
+
+      final data = doc.data() as Map<String, dynamic>;
+      return data["role"];
+    } catch (e) {
+      throw Exception("Login failed: $e");
+    }
   }
 
   // ================= GET ROLE =================
@@ -53,7 +74,10 @@ class AuthService {
     DocumentSnapshot doc =
         await _db.collection("users").doc(user.uid).get();
 
-    return doc["role"];
+    if (!doc.exists) return null;
+
+    final data = doc.data() as Map<String, dynamic>;
+    return data["role"];
   }
 
   // ================= CHECK LOGIN =================

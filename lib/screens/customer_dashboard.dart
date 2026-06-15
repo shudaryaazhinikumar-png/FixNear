@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CustomerDashboard extends StatefulWidget {
   final String? userName;
@@ -29,6 +31,7 @@ class CustomerDashboard extends StatefulWidget {
 }
 
 class _CustomerDashboardState extends State<CustomerDashboard> {
+  final MapController _mapController = MapController();
   int _currentStep = 0;
   String bookingId = "booking_123";
   String? _selectedCategory;
@@ -37,11 +40,9 @@ class _CustomerDashboardState extends State<CustomerDashboard> {
 
   String _selectedPaymentMethod = 'UPI';
 
-GoogleMapController? _mapController;
 
 LatLng _providerLatLng = const LatLng(11.0168, 76.9558);
-LatLng _customerLatLng = const LatLng(11.0160, 76.9550);
-
+LatLng _customerLatLng = const LatLng(11.0168, 76.9558);
 StreamSubscription<Position>? _locationStream;
 
   static const Color oliveGreen = Color(0xFF556B2F);
@@ -112,10 +113,14 @@ StreamSubscription<Position>? _locationStream;
         data["customerLng"],
       );
     });
-
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(_providerLatLng),
-    );
+    _mapController.move(
+  LatLng(
+    _providerLatLng.latitude,
+    _providerLatLng.longitude,
+  ),
+  15,
+);
+    
   });
 }
   @override
@@ -215,55 +220,106 @@ StreamSubscription<Position>? _locationStream;
 
   // STEP 2
   Widget _issueProviderView() {
-    final issues = _issuesMap[_selectedCategory!] ?? [];
+  final issues = _issuesMap[_selectedCategory!] ?? [];
 
-    return Column(
-      children: [
-        Text("Category: $_selectedCategory"),
-        const SizedBox(height: 10),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        "Category: $_selectedCategory",
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
 
-        DropdownButton<String>(
-          value: _selectedIssue,
-          items: issues
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: (val) {
-            setState(() {
-              _selectedIssue = val;
-            });
-          },
-        ),
+      const SizedBox(height: 10),
 
-        const SizedBox(height: 20),
+      DropdownButton<String>(
+        value: _selectedIssue,
+        isExpanded: true,
+        items: issues
+            .map((e) => DropdownMenuItem(
+                  value: e,
+                  child: Text(e),
+                ))
+            .toList(),
+        onChanged: (val) {
+          setState(() {
+            _selectedIssue = val;
+          });
+        },
+      ),
 
-        ..._providers.map((p) {
-          return Card(
-            child: ListTile(
-              title: Text(p['name']),
-              subtitle: Text("⭐ ${p['rating']} | ${p['distance']}"),
-              trailing: p['isAvailable']
-                  ? ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedProvider = p;
-                          _currentStep = 3;
+      const SizedBox(height: 20),
 
-                          // ✅ START LIVE TRACKING HERE
-                          _startRealTracking();
-                        });
-                      },
-                      child: const Text("Book"),
-                    )
-                  : const Text("Busy"),
-            ),
-          );
-        }),
-      ],
-    );
-  }
+      const Text(
+        "Select Provider",
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+
+      const SizedBox(height: 10),
+
+      ..._providers.map((p) {
+        return Card(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ListTile(
+            title: Text(p['name']),
+            subtitle: Text("⭐ ${p['rating']} | ${p['distance']}"),
+
+            trailing: p['isAvailable']
+                ? ElevatedButton(
+                    child: const Text("Book"),
+
+                    onPressed: () async {
+                      setState(() {
+                        _selectedProvider = p;
+                      });
+
+                      final customerId =
+                          FirebaseAuth.instance.currentUser?.uid ?? "";
+
+                      // ✅ FIXED: SAFE providerId (NO NULL ERROR)
+                      final providerId =
+                          p['id'] ?? p['name']; // fallback added
+
+                      // 🔥 CREATE BOOKING
+                      DocumentReference doc = await FirebaseFirestore.instance
+                          .collection("bookings")
+                          .add({
+                        "customerId": customerId,
+                        "customerName": widget.userName ?? "",
+                        "customerPhone": widget.phone ?? "",
+
+                        "providerId": providerId,
+                        "providerName": p['name'],
+
+                        "category": _selectedCategory,
+                        "issue": _selectedIssue,
+
+                        "status": "pending",
+                        "createdAt": FieldValue.serverTimestamp(),
+                      });
+
+                      bookingId = doc.id;
+
+                      setState(() {
+                        _currentStep = 3;
+                      });
+
+                      _startUberTracking();
+                    },
+                  )
+                : const Text(
+                    "Busy",
+                    style: TextStyle(color: Colors.red),
+                  ),
+          ),
+        );
+      }).toList(),
+    ],
+  );
+}
 
   // STEP 3 (LIVE TRACKING ONLY ADDED HERE)
-   Widget _trackingView() {
+    Widget _trackingView() {
   return Column(
     children: [
       Text("Tracking ${_selectedProvider?['name']}"),
@@ -271,40 +327,44 @@ StreamSubscription<Position>? _locationStream;
 
       SizedBox(
         height: 350,
-        child: GoogleMap(
-          initialCameraPosition: CameraPosition(
-            target: _providerLatLng,
-            zoom: 15,
+        child: FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _customerLatLng,
+            initialZoom: 15,
           ),
-
-          markers: {
-            Marker(
-              markerId: const MarkerId("provider"),
-              position: _providerLatLng,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueBlue,
-              ),
+          children: [
+            TileLayer(
+              urlTemplate: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+              userAgentPackageName: 'com.example.fixnear',
             ),
-            Marker(
-              markerId: const MarkerId("customer"),
-              position: _customerLatLng,
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueGreen,
-              ),
-            ),
-          },
 
-          polylines: {
-            Polyline(
-              polylineId: const PolylineId("route"),
-              points: [_customerLatLng, _providerLatLng],
-              width: 4,
-            ),
-          },
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: _providerLatLng,
+                  width: 40,
+                  height: 40,
+                  child: const Icon(
+                    Icons.location_pin,
+                    color: Colors.blue,
+                    size: 40,
+                  ),
+                ),
 
-          onMapCreated: (controller) {
-            _mapController = controller;
-          },
+                Marker(
+                  point: _customerLatLng,
+                  width: 40,
+                  height: 40,
+                  child: const Icon(
+                    Icons.person_pin_circle,
+                    color: Colors.green,
+                    size: 40,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
 
@@ -321,7 +381,7 @@ StreamSubscription<Position>? _locationStream;
       ),
     ],
   );
-}
+}  
   // STEP 4
   Widget _paymentView() {
     return Column(
@@ -390,7 +450,10 @@ StreamSubscription<Position>? _locationStream;
   void _startRealTracking() async {
   LocationPermission permission = await Geolocator.requestPermission();
 
-  if (permission == LocationPermission.denied) return;
+  if (permission == LocationPermission.denied ||
+      permission == LocationPermission.deniedForever) {
+    return;
+  }
 
   _locationStream = Geolocator.getPositionStream(
     locationSettings: const LocationSettings(
@@ -399,12 +462,13 @@ StreamSubscription<Position>? _locationStream;
     ),
   ).listen((Position position) {
     setState(() {
-      _customerLatLng = LatLng(position.latitude, position.longitude);
+      _customerLatLng = LatLng(
+        position.latitude,
+        position.longitude,
+      );
     });
 
-    _mapController?.animateCamera(
-      CameraUpdate.newLatLng(_customerLatLng),
-    );
+    _mapController.move(_customerLatLng, 15);
   });
 }
 }
