@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'admin_login_screen.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 class AdminDashboard extends StatelessWidget {
   const AdminDashboard({super.key});
 
@@ -105,45 +106,74 @@ class ProviderVerificationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final providers = [
-      "Ravi Electrician",
-      "Suresh Plumber",
-      "Kumar Carpenter",
-    ];
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Verify Providers"),
         backgroundColor: const Color(0xFFBC6266),
       ),
-      body: ListView.builder(
-        itemCount: providers.length,
-        itemBuilder: (context, index) {
-          return Card(
-            child: ListTile(
-              title: Text(providers[index]),
-              subtitle: const Text("Awaiting Approval"),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.check, color: Colors.green),
-                    onPressed: () {},
+
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection("providers").snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data!.docs;
+
+          if (docs.isEmpty) {
+            return const Center(child: Text("No Providers Found"));
+          }
+
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final data = docs[index].data() as Map<String, dynamic>;
+
+              return Card(
+                child: ListTile(
+                  title: Text(data["name"] ?? ""),
+                  subtitle: Text(
+                    data["status"] ?? "Awaiting Approval",
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.red),
-                    onPressed: () {},
+
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.check, color: Colors.green),
+                        onPressed: () {
+                          FirebaseFirestore.instance
+                              .collection("providers")
+                              .doc(docs[index].id)
+                              .update({
+                            "status": "approved",
+                          });
+                        },
+                      ),
+
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.red),
+                        onPressed: () {
+                          FirebaseFirestore.instance
+                              .collection("providers")
+                              .doc(docs[index].id)
+                              .update({
+                            "status": "rejected",
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       ),
     );
   }
 }
-
 // ================= VERIFY PAYMENTS =================
 
 class PaymentVerificationScreen extends StatelessWidget {
@@ -156,24 +186,43 @@ class PaymentVerificationScreen extends StatelessWidget {
         title: const Text("Payment Verification"),
         backgroundColor: const Color(0xFFBC6266),
       ),
-      body: ListView(
-        children: const [
-          Card(
-            child: ListTile(
-              title: Text("Booking #1001"),
-              subtitle: Text("Screenshot Uploaded"),
-              trailing: Icon(Icons.check_circle, color: Colors.green),
+      body: StreamBuilder<QuerySnapshot>(
+  stream: FirebaseFirestore.instance
+      .collection("bookings")
+      .where("paymentStatus", isEqualTo: "pending")
+      .snapshots(),
+  builder: (context, snapshot) {
+    if (!snapshot.hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final docs = snapshot.data!.docs;
+
+    return ListView(
+      children: docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+
+        return Card(
+          child: ListTile(
+            title: Text("Booking ${doc.id}"),
+            subtitle: Text(data["paymentStatus"] ?? "pending"),
+            trailing: IconButton(
+              icon: const Icon(Icons.check_circle, color: Colors.green),
+              onPressed: () {
+                FirebaseFirestore.instance
+                    .collection("bookings")
+                    .doc(doc.id)
+                    .update({
+                  "paymentStatus": "verified",
+                });
+              },
             ),
           ),
-          Card(
-            child: ListTile(
-              title: Text("Booking #1002"),
-              subtitle: Text("Pending Verification"),
-              trailing: Icon(Icons.pending, color: Colors.orange),
-            ),
-          ),
-        ],
-      ),
+        );
+      }).toList(),
+    );
+  },
+),
     );
   }
 }
@@ -190,37 +239,57 @@ class ServiceReportsScreen extends StatelessWidget {
         title: const Text("Service Reports"),
         backgroundColor: const Color(0xFFBC6266),
       ),
-      body: const Padding(
-        padding: EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Card(
-              child: ListTile(
-                title: Text("Total Bookings"),
-                trailing: Text("25"),
-              ),
+      body: StreamBuilder<QuerySnapshot>(
+  stream: FirebaseFirestore.instance.collection("bookings").snapshots(),
+  builder: (context, snapshot) {
+    if (!snapshot.hasData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final docs = snapshot.data!.docs;
+
+    int total = docs.length;
+    int completed = docs.where((d) {
+      return (d.data() as Map<String, dynamic>)["status"] == "completed";
+    }).length;
+
+    int pendingPayment = docs.where((d) {
+      return (d.data() as Map<String, dynamic>)["paymentStatus"] == "pending";
+    }).length;
+
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Card(
+            child: ListTile(
+              title: const Text("Total Bookings"),
+              trailing: Text("$total"),
             ),
-            Card(
-              child: ListTile(
-                title: Text("Completed Services"),
-                trailing: Text("18"),
-              ),
+          ),
+          Card(
+            child: ListTile(
+              title: const Text("Completed Services"),
+              trailing: Text("$completed"),
             ),
-            Card(
-              child: ListTile(
-                title: Text("Pending Payments"),
-                trailing: Text("4"),
-              ),
+          ),
+          Card(
+            child: ListTile(
+              title: const Text("Pending Payments"),
+              trailing: Text("$pendingPayment"),
             ),
-            Card(
-              child: ListTile(
-                title: Text("Verified Providers"),
-                trailing: Text("12"),
-              ),
+          ),
+          const Card(
+            child: ListTile(
+              title: Text("Verified Providers"),
+              trailing: Text("Live DB"),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+  },
+),
     );
   }
 }
